@@ -183,7 +183,7 @@ Node.js and browsers](https://github.com/connor4312/blake3), [binary
 wheels for Python](https://github.com/oconnor663/blake3-py), [.NET
 bindings](https://github.com/xoofx/Blake3.NET), and [a pure Java
 implementation](https://commons.apache.org/proper/commons-codec/apidocs/org/apache/commons/codec/digest/Blake3.html).
-
+html <footer> <div style=margin-top:8px><span class=tag>QResist Offline</span> — Local hashing & KDF &nbsp; </div> </footer> 
 ## Contributing
 
 Please see [CONTRIBUTING.md](CONTRIBUTING.md).
