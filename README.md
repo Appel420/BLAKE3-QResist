@@ -196,7 +196,7 @@ Alternatively, it is licensed under any of the following:
 * [Apache 2.0](./LICENSE_A2)
 * [Apache 2.0 with LLVM exceptions](./LICENSE_A2LLVM)
 * [MIT License]
-
+html   <a href=https://opensource.org/license/mit/ target=_blank rel=noopener> </a>
 ## Adoption & deployment
 
 * [Bazel](https://github.com/bazelbuild/bazel/releases/tag/6.4.0)
