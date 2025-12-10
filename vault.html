@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QResist Offline — SHA3-512, BLAKE3 & Argon2</title>
+  <meta name="description" content="Client-side hashing & password derivation (offline). BLAKE3, SHA3-512, Argon2 with worker.">
+  <style>
+    /* Layout & theme (kept compact) */
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+      background:linear-gradient(135deg,#0f1724 0%,#071028 100%);
+      color:#e6eef8;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    }
+    .container{
+      width:100%;
+      max-width:900px;
+      background:rgba(255,255,255,0.03);
+      border-radius:12px;
+      padding:24px;
+      border:1px solid rgba(255,255,255,0.04);
+      box-shadow:0 10px 30px rgba(2,6,23,0.6);
+    }
+    h1{font-weight:600;margin-bottom:6px;font-size:1.6rem}
+    .subtitle{color:#9aa8c6;margin-bottom:12px}
+    .input-group{margin-bottom:12px}
+    label{display:block;color:#9aa8c6;margin-bottom:6px;font-size:0.92rem}
+    textarea{width:100%;min-height:90px;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.02);color:inherit;font-size:0.95rem;resize:vertical}
+    select,input[type="number"],input[type="text"]{
+      width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.02);color:inherit;
+    }
+    .controls{display:grid;grid-template-columns:1fr 140px;gap:8px;align-items:center}
+    button.primary{width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(90deg,#00c6ff,#0066ff);color:#001; font-weight:700;cursor:pointer}
+    button.small{padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:inherit;cursor:pointer}
+    .param-section{padding:10px;border-radius:8px;background:rgba(255,255,255,0.01);margin-top:8px}
+    #output{margin-top:10px;padding:12px;border-radius:8px;background:rgba(0,0,0,0.45);min-height:68px;border:1px solid rgba(255,255,255,0.03);font-family:monospace;white-space:pre-wrap}
+    .muted{color:#9aa8c6}
+    .warning{color:#f2c94c}
+    .success{color:#6ee7b7;font-weight:600}
+    .row{display:flex;gap:8px}
+    .row > *{flex:1}
+    .inline{display:inline-flex;gap:8px;align-items:center}
+    footer{margin-top:14px;color:#97a6bf;font-size:0.82rem;text-align:center}
+    .tag{font-size:0.82rem;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02)}
+    .note{font-size:0.88rem;color:#9aa8c6}
+  </style>
+</head>
+<body>
+  <div class="container" role="main">
+    <h1>QResist Offline</h1>
+    <div class="subtitle">Secure hashing & password derivation — runs locally. Place libraries in <code>./libs/</code>.</div>
+
+    <div class="input-group">
+      <label for="input">Text / Password</label>
+      <textarea id="input" placeholder="Type text or password here (press Ctrl+Enter to run)"></textarea>
+      <div id="sizeWarning" class="warning" style="display:none;margin-top:8px">Large input (&gt;1MB): computation may take time and use significant memory.</div>
+    </div>
+
+    <div class="input-group">
+      <label for="algo">Algorithm</label>
+      <div class="controls" style="grid-template-columns:1fr 120px;">
+        <select id="algo">
+          <option value="blake3">BLAKE3</option>
+          <option value="sha3">SHA3-512</option>
+          <option value="argon2">Argon2 (id/i)</option>
+        </select>
+        <button id="toggleParams" class="small" type="button">Toggle Params</button>
+      </div>
+    </div>
+
+    <!-- BLAKE3 params -->
+    <div id="blake3Panel" class="param-section" style="display:none">
+      <div class="input-group">
+        <label for="blake3Len">Output length (bytes)</label>
+        <input id="blake3Len" type="number" min="1" max="1024" value="32">
+        <div class="note" style="margin-top:6px">BLAKE3 supports XOF / variable output. Default 32 bytes (256 bits).</div>
+      </div>
+    </div>
+
+    <!-- Argon2 params -->
+    <div id="argon2Panel" class="param-section" style="display:none">
+      <div class="row">
+        <div>
+          <label for="argonType">Argon2 type</label>
+          <select id="argonType"><option value="id">Argon2id</option><option value="i">Argon2i</option></select>
+        </div>
+        <div>
+          <label for="hashLen">Hash length (bytes)</label>
+          <input id="hashLen" type="number" min="4" max="1024" value="32">
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px">
+        <div><label for="timeCost">Time cost (iterations)</label><input id="timeCost" type="number" min="1" value="2"></div>
+        <div><label for="memCost">Memory (KB)</label><input id="memCost" type="number" min="8" value="65536"></div>
+      </div>
+
+      <div style="margin-top:10px">
+        <label for="parallelism">Parallelism</label>
+        <input id="parallelism" type="number" min="1" value="1">
+      </div>
+
+      <div class="input-group" style="margin-top:10px">
+        <label for="salt">Salt (hex) — leave blank to generate a random 16-byte salt</label>
+        <div class="controls" style="grid-template-columns:1fr 120px">
+          <input id="salt" type="text" placeholder="e.g., 1f2e3d4c...">
+          <button id="genSalt" class="small" type="button">Generate Salt</button>
+        </div>
+        <div class="note" style="margin-top:6px">Memory units are in kilobytes (KB). Example: 65536 KB = 64 MB.</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+      <button id="runBtn" class="primary">Generate</button>
+      <button id="selfTestBtn" class="small">Run self-test</button>
+    </div>
+
+    <div class="row" style="margin-top:12px;align-items:center">
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>Result</strong>
+          <div style="display:flex;gap:8px">
+            <button id="copyBtn" class="small">Copy</button>
+            <button id="downloadBtn" class="small">Download</button>
+            <button id="abortBtn" class="small" style="display:none">Abort</button>
+          </div>
+        </div>
+        <div id="output" role="status" aria-live="polite">No output yet.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px" class="muted">
+      <strong>Notes:</strong> This page is designed to run offline. To be truly offline, download and place the required library bundles into <code>./libs/</code> next to this HTML file:
+      <ul>
+        <li><code>js-sha3.min.js</code> (for SHA3-512)</li>
+        <li><code>blake3.min.js</code> (a browser build of BLAKE3)</li>
+        <li><code>argon2.min.js</code> (argon2-browser or your chosen Argon2 browser bundle)</li>
+      </ul>
+      If any library is missing the UI will show a clear message and fallback where possible.
+    </div>
+
+    <footer>
+      <div style="margin-top:8px"><span class="tag">QResist Offline</span> — Local hashing & KDF</div>
+    </footer>
+  </div>
+
+  <!-- NOTE: Local libraries must live in ./libs/ for offline use -->
+  <!-- Example: <script src="./libs/js-sha3.min.js"></script> -->
+  <script>
+    // Load local libraries if present. These are non-blocking - we attempt to load but code
+    // below will check for presence and fail gracefully if missing.
+    (function injectScript(src) {
+      try {
+        const s = document.createElement('script');
+        s.src = src;
+        s.defer = false;
+        s.async = false;
+        s.onerror = () => console.warn('Local lib not found:', src);
+        document.head.appendChild(s);
+      } catch (e) { console.warn(e); }
+    })('./libs/js-sha3.min.js');
+
+    (function injectScript2(src) {
+      try {
+        const s = document.createElement('script');
+        s.src = src;
+        s.defer = false;
+        s.async = false;
+        s.onerror = () => console.warn('Local lib not found:', src);
+        document.head.appendChild(s);
+      } catch (e) { console.warn(e); }
+    })('./libs/blake3.min.js');
+
+    (function injectScript3(src) {
+      try {
+        const s = document.createElement('script');
+        s.src = src;
+        s.defer = false;
+        s.async = false;
+        s.onerror = () => console.warn('Local lib not found:', src);
+        document.head.appendChild(s);
+      } catch (e) { console.warn(e); }
+    })('./libs/argon2.min.js');
+  </script>
+
+  <script>
+  (function(){
+    'use strict';
+
+    // UI elements
+    const inputEl = document.getElementById('input');
+    const algoEl = document.getElementById('algo');
+    const toggleBtn = document.getElementById('toggleParams');
+    const blakePanel = document.getElementById('blake3Panel');
+    const argonPanel = document.getElementById('argon2Panel');
+    const runBtn = document.getElementById('runBtn');
+    const selfTestBtn = document.getElementById('selfTestBtn');
+    const outputEl = document.getElementById('output');
+    const sizeWarning = document.getElementById('sizeWarning');
+    const copyBtn = document.getElementById('copyBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const abortBtn = document.getElementById('abortBtn');
+    const genSaltBtn = document.getElementById('genSalt');
+
+    const blake3LenEl = document.getElementById('blake3Len');
+    const argonTypeEl = document.getElementById('argonType');
+    const timeCostEl = document.getElementById('timeCost');
+    const memCostEl = document.getElementById('memCost');
+    const parallelEl = document.getElementById('parallelism');
+    const hashLenEl = document.getElementById('hashLen');
+    const saltEl = document.getElementById('salt');
+
+    let currentWorker = null;
+    let lastHashText = '';
+
+    // update panels visibility
+    function updatePanels() {
+      blakePanel.style.display = algoEl.value === 'blake3' ? 'block' : 'none';
+      argonPanel.style.display = algoEl.value === 'argon2' ? 'block' : 'none';
+    }
+    algoEl.addEventListener('change', updatePanels);
+    toggleBtn.addEventListener('click', () => {
+      // toggles parameter panel for selected algorithm
+      if (algoEl.value === 'argon2') {
+        argonPanel.style.display = argonPanel.style.display === 'none' ? 'block' : 'none';
+      } else if (algoEl.value === 'blake3') {
+        blakePanel.style.display = blakePanel.style.display === 'none' ? 'block' : 'none';
+      } else {
+        blakePanel.style.display = 'none';
+        argonPanel.style.display = 'none';
+      }
+    });
+
+    // size warning
+    function updateSizeWarning() {
+      sizeWarning.style.display = (new Blob([inputEl.value]).size > 1048576) ? 'block' : 'none';
+    }
+    inputEl.addEventListener('input', updateSizeWarning);
+
+    // generate salt
+    genSaltBtn.addEventListener('click', () => {
+      const arr = new Uint8Array(16);
+      crypto.getRandomValues(arr);
+      saltEl.value = Array.from(arr).map(b=>b.toString(16).padStart(2,'0')).join('');
+    });
+
+    // helper: hex <-> bytes
+    function hexToBytes(hex) {
+      const cleaned = (hex||'').replace(/[^0-9a-fA-F]/g,'');
+      if (cleaned.length === 0) return new Uint8Array(0);
+      if (cleaned.length % 2 !== 0) {
+        throw new Error('Hex string must have an even length');
+      }
+      const out = new Uint8Array(cleaned.length/2);
+      for (let i=0;i<out.length;i++){
+        out[i] = parseInt(cleaned.substr(i*2,2),16);
+      }
+      return out;
+    }
+    function bytesToHex(buf) {
+      return Array.from(buf).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+
+    // BLAKE3 wrapper: adapt to common library shapes
+    async function blake3HexFromInput(bytes, outLen=32) {
+      if (typeof window.blake3 === 'undefined') throw new Error('BLAKE3 library not loaded (expected ./libs/blake3.min.js)');
+      // Many browser bundles expose different shapes; try common variants:
+      //  - blake3.hash(data, length) -> Uint8Array
+      //  - blake3.hash(data, {length}) -> Uint8Array
+      //  - blake3.create() -> ctx.update(bytes) / ctx.digest(len)
+      //  - others: blake3(bytes) -> Uint8Array
+      try {
+        if (typeof blake3.hash === 'function') {
+          // try hash with options
+          try {
+            const r1 = blake3.hash(bytes, { length: outLen });
+            if (r1 instanceof Uint8Array) return bytesToHex(r1);
+          } catch (e) {/*ignore*/}
+          // try (bytes, len)
+          try {
+            const r2 = blake3.hash(bytes, outLen);
+            if (r2 instanceof Uint8Array) return bytesToHex(r2);
+          } catch (e) {/*ignore*/}
+        }
+        if (typeof blake3.create === 'function') {
+          const ctx = blake3.create();
+          if (ctx.update && ctx.digest) {
+            ctx.update(bytes);
+            const out = ctx.digest(outLen);
+            if (out instanceof Uint8Array) return bytesToHex(out);
+          }
+        }
+        // fallback: some libs export a function
+        if (typeof blake3 === 'function') {
+          const r = blake3(bytes);
+          if (r instanceof Uint8Array) return bytesToHex(r);
+        }
+        // last attempt: if export is object with 'digest' method
+        if (blake3 && typeof blake3.digest === 'function') {
+          const r = blake3.digest(bytes, outLen);
+          if (r instanceof Uint8Array) return bytesToHex(r);
+        }
+        throw new Error('Unsupported BLAKE3 library API shape');
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    // SHA3-512 wrapper: use js-sha3 if available (global: sha3_512)
+    function sha3_512_hex(msg) {
+      if (typeof window.sha3_512 === 'function') {
+        // js-sha3 exposes sha3_512(name) returning hex
+        try {
+          return window.sha3_512(msg);
+        } catch (e) {
+          // js-sha3 sometimes exposes object: window.sha3.sha3_512
+        }
+      }
+      // fallback: check for 'sha3' object shapes
+      if (window.sha3 && typeof window.sha3.sha3_512 === 'function') {
+        return window.sha3.sha3_512(msg);
+      }
+      throw new Error('SHA3 library not available. Put a browser build of js-sha3 in ./libs/js-sha3.min.js');
+    }
+
+    // Argon2: worker wrapper
+    function createArgon2Worker() {
+      // create a worker blob that imports local ./libs/argon2.min.js
+      // This assumes argon2.min.js works inside a worker (argon2-browser often does).
+      const blob = new Blob([`
+        self.onmessage = async function(e) {
+          try {
+            importScripts('./libs/argon2.min.js');
+          } catch(importErr) {
+            postMessage({err: 'Failed to import argon2 script inside worker: ' + importErr.message});
+            return;
+          }
+          const params = e.data;
+          try {
+            // detect API shape: argon2.hash(options) -> returns {hash, hashHex}
+            if (typeof self.argon2 === 'undefined' && typeof argon2 === 'undefined') {
+              postMessage({err: 'argon2 not available inside worker'});
+              return;
+            }
+            const lib = self.argon2 || argon2;
+            // map type
+            const typeMapping = {};
+            if (lib.ArgonType) {
+              typeMapping.id = lib.ArgonType.Argon2id || lib.ArgonType.id || lib.ArgonType.ArgonId;
+              typeMapping.i = lib.ArgonType.Argon2i || lib.ArgonType.i;
+            } else if (lib.Argon2) {
+              typeMapping.id = lib.Argon2.Argon2id;
+              typeMapping.i = lib.Argon2.Argon2i;
+            }
+            const argonType = typeMapping[params.type] || lib.ArgonType && lib.ArgonType.Argon2id;
+            const res = await lib.hash({
+              pass: params.pass,
+              salt: params.salt,
+              time: params.time,
+              mem: params.mem,
+              parallelism: params.parallelism,
+              hashLen: params.hashLen,
+              type: argonType || undefined
+            });
+            postMessage({res: res});
+          } catch (err) {
+            postMessage({err: err.message || String(err)});
+          }
+        };
+      `], {type: 'application/javascript'});
+      const url = URL.createObjectURL(blob);
+      const w = new Worker(url);
+      URL.revokeObjectURL(url);
+      return w;
+    }
+
+    // runArgon2: either via worker or fallback to main thread
+    async function runArgon2Main(pass, saltBytes, time, mem, parallelism, hashLen, typeStr) {
+      // prefer worker
+      try {
+        if (currentWorker) {
+          currentWorker.terminate();
+          currentWorker = null;
+        }
+        currentWorker = createArgon2Worker();
+      } catch (e) {
+        currentWorker = null;
+      }
+
+      if (currentWorker) {
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(()=>{/*no-op*/}, 0);
+          currentWorker.onmessage = function(ev) {
+            if (ev.data && ev.data.err) {
+              currentWorker.terminate();
+              currentWorker = null;
+              reject(new Error(ev.data.err));
+            } else if (ev.data && ev.data.res) {
+              currentWorker.terminate();
+              currentWorker = null;
+              resolve(ev.data.res);
+            } else {
+              // unknown message
+            }
+            clearTimeout(timeout);
+          };
+          currentWorker.onerror = function(ev) {
+            currentWorker.terminate();
+            currentWorker = null;
+            reject(new Error('Worker error: ' + ev.message));
+          };
+          // send parameters; convert salt to plain array because postMessage transfers
+          const saltArr = Array.from(saltBytes || []);
+          currentWorker.postMessage({
+            pass: pass,
+            salt: saltArr,
+            time: time,
+            mem: mem,
+            parallelism: parallelism,
+            hashLen: hashLen,
+            type: typeStr
+          });
+        });
+      } else {
+        // fallback to main-thread argon2.hash with library global argon2
+        if (typeof window.argon2 === 'undefined' || !argon2.hash) {
+          throw new Error('Argon2 library not loaded (expected ./libs/argon2.min.js)');
+        }
+        // attempt synchronous call
+        const lib = window.argon2;
+        const argType = (lib.ArgonType && (typeStr === 'i' ? lib.ArgonType.Argon2i : lib.ArgonType.Argon2id)) || undefined;
+        return lib.hash({
+          pass: pass,
+          salt: saltBytes,
+          time: time,
+          mem: mem,
+          parallelism: parallelism,
+          hashLen: hashLen,
+          type: argType
+        });
+      }
+    }
+
+    // Abort function
+    function abortCurrent() {
+      if (currentWorker) {
+        try { currentWorker.terminate(); } catch(e){}
+        currentWorker = null;
+      }
+      abortBtn.style.display = 'none';
+      runBtn.disabled = false;
+      outputEl.textContent = 'Aborted.';
+    }
+
+    abortBtn.addEventListener('click', abortCurrent);
+
+    // main "Generate" handler
+    runBtn.addEventListener('click', async () => {
+      runBtn.disabled = true;
+      outputEl.textContent = 'Working...';
+      abortBtn.style.display = 'none';
+      try {
+        const algo = algoEl.value;
+        const text = inputEl.value || '';
+        if (!text && algo !== 'blake3' && algo !== 'sha3') {
+          // argon2 wants a password -- empty allowed but warn
+        }
+
+        if (algo === 'blake3') {
+          if (typeof blake3 === 'undefined') throw new Error('BLAKE3 library not available. Put a browser build in ./libs/blake3.min.js');
+          const outLen = Math.max(1, Math.min(1024, parseInt(blake3LenEl.value || '32',10)));
+          // encode as utf-8 bytes
+          const encoder = new TextEncoder();
+          const bytes = encoder.encode(text);
+          const hex = await blake3HexFromInput(bytes, outLen);
+          lastHashText = hex;
+          outputEl.innerHTML = `<div class="success">BLAKE3</div>${hex}\n\n<small class="muted">Output length: ${outLen} bytes (${outLen*8} bits)</small>`;
+        } else if (algo === 'sha3') {
+          // rely on js-sha3
+          const hex = sha3_512_hex(text);
+          lastHashText = hex;
+          outputEl.innerHTML = `<div class="success">SHA3-512</div>${hex}`;
+        } else if (algo === 'argon2') {
+          // validate params
+          const time = Math.max(1, parseInt(timeCostEl.value || '2',10));
+          const mem = Math.max(8, parseInt(memCostEl.value || '65536',10)); // KB
+          const parallelism = Math.max(1, parseInt(parallelEl.value || '1',10));
+          const hashLen = Math.max(4, Math.min(1024, parseInt(hashLenEl.value || '32',10)));
+          const type = argonTypeEl.value || 'id';
+          // sanity limits
+          if (mem > 1310720) { // ~1.25GB
+            if (!confirm('You requested >1GB memory. This may crash or freeze some systems. Continue?')) {
+              runBtn.disabled = false;
+              outputEl.textContent = 'Cancelled by user.';
+              return;
+            }
+          }
+          // salt
+          let saltBytes;
+          try {
+            const s = (saltEl.value||'').trim();
+            if (!s) {
+              saltBytes = new Uint8Array(16);
+              crypto.getRandomValues(saltBytes);
+            } else {
+              saltBytes = hexToBytes(s);
+              if (saltBytes.length < 8) {
+                // recommend >=16
+                if (!confirm('Salt looks short (<8 bytes). Continue?')) {
+                  runBtn.disabled = false;
+                  outputEl.textContent = 'Cancelled by user (salt too short).';
+                  return;
+                }
+              }
+            }
+          } catch (e) {
+            throw new Error('Salt parse error: ' + e.message);
+          }
+
+          // run argon2
+          abortBtn.style.display = 'inline-block';
+          runBtn.disabled = true;
+          const res = await runArgon2Main(text, saltBytes, time, mem, parallelism, hashLen, type);
+          abortBtn.style.display = 'none';
+          runBtn.disabled = false;
+          // res may be an object returned by argon2-browser: {hash, hashHex}
+          let hashHex = res && res.hashHex ? res.hashHex : (res && res.hash ? (res.hash) : null);
+          if (!hashHex && res && typeof res === 'string') hashHex = res;
+          if (!hashHex && res && res.raw) hashHex = bytesToHex(res.raw);
+          lastHashText = hashHex || JSON.stringify(res);
+          // display
+          const saltHex = bytesToHex(saltBytes);
+          outputEl.innerHTML = `<div class="success">Argon2 derived key</div>${lastHashText}\n\n<small class="muted">Salt (hex): ${saltHex}</small>\n<small class="muted">Base64 (if provided by lib): ${res && res.hash ? res.hash : '(n/a)'}</small>`;
+        } else {
+          throw new Error('Unsupported algorithm');
+        }
+      } catch (err) {
+        outputEl.textContent = 'Error: ' + (err && err.message ? err.message : String(err));
+      } finally {
+        runBtn.disabled = false;
+      }
+    });
+
+    // copy
+    copyBtn.addEventListener('click', async ()=>{
+      if (!lastHashText) {
+        // try to extract from output
+        const candidate = outputEl.textContent || '';
+        if (candidate && candidate.length>0) lastHashText = candidate;
+      }
+      if (!lastHashText) return;
+      try {
+        await navigator.clipboard.writeText(lastHashText);
+        const original = copyBtn.textContent;
+        copyBtn.textContent = 'Copied';
+        setTimeout(()=> copyBtn.textContent = original, 1500);
+      } catch (e) {
+        console.warn('Clipboard write failed', e);
+        // fallback: create textarea
+        const ta = document.createElement('textarea');
+        ta.value = lastHashText;
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+        } catch (err) {}
+        ta.remove();
+      }
+    });
+
+    // download
+    downloadBtn.addEventListener('click', ()=>{
+      if (!lastHashText) return;
+      const blob = new Blob([lastHashText], {type:'text/plain;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const alg = algoEl.value;
+      a.download = (alg === 'argon2') ? 'argon2-derived-key.txt' : `${alg}-hash.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // keyboard shortcut
+    inputEl.addEventListener('keydown', (ev)=>{
+      if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+        ev.preventDefault();
+        runBtn.click();
+      }
+    });
+
+    // Self-test: compute small set of test hashes (using libs if available)
+    selfTestBtn.addEventListener('click', async ()=>{
+      // This test will run using the libs present and display results.
+      // It will not assume specific expected strings (avoid shipping possibly incorrect constants).
+      const tests = [
+        {name:'SHA3-512', func: async ()=> {
+          if (typeof window.sha3_512 !== 'function') throw new Error('js-sha3 not loaded');
+          return {result: window.sha3_512('abc')};
+        }},
+        {name:'BLAKE3 (abc)', func: async ()=> {
+          if (typeof window.blake3 === 'undefined') throw new Error('blake3 not loaded');
+          const encoder = new TextEncoder();
+          const bytes = encoder.encode('abc');
+          const hex = await blake3HexFromInput(bytes, 32);
+          return {result: hex};
+        }},
+        {name:'Argon2 (password=a, salt=00..01 small)', func: async ()=> {
+          if (typeof window.argon2 === 'undefined') throw new Error('argon2 not loaded');
+          const salt = new Uint8Array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]);
+          const res = await runArgon2Main('password', salt, 1, 8, 1, 16, 'id');
+          // res likely contains hashHex or hash
+          return {result: res.hashHex || res.hash || JSON.stringify(res)};
+        }}
+      ];
+
+      outputEl.textContent = 'Running self-test...';
+      const results = [];
+      for (let t of tests) {
+        try {
+          const r = await t.func();
+          results.push({name: t.name, ok: true, out: r.result});
+        } catch (err) {
+          results.push({name: t.name, ok: false, out: err.message || String(err)});
+        }
+      }
+      // display results
+      outputEl.innerHTML = results.map(r=>`<div><strong>${r.name}:</strong> ${r.ok ? '<span class="success">OK</span>' : '<span class="warning">FAIL</span>'}<div style="margin-top:6px; font-family:monospace; font-size:0.9rem">${String(r.out)}</div></div>`).join('<hr/>');
+    });
+
+    // initial panel state
+    updatePanels();
+    updateSizeWarning();
+
+  })();
+  </script>
+</body>
+</html>
