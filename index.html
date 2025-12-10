@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QResist Offline - SHA-3-512, BLAKE3 & Argon2</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+```
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        color: #fff;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        line-height: 1.6;
+    }
+    
+    .container {
+        max-width: 800px;
+        width: 100%;
+        padding: 2.5rem;
+        background: rgba(0, 0, 0, 0.4);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(15px);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    }
+    
+    h1 {
+        font-size: 2.2rem;
+        font-weight: 300;
+        background: linear-gradient(45deg, #00f5ff, #ff0080);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+        text-align: center;
+        letter-spacing: 1px;
+    }
+    
+    .subtitle {
+        text-align: center;
+        margin-bottom: 1.2rem;
+        color: #a0a0c0;
+        font-weight: 300;
+    }
+    
+    .input-group {
+        margin-bottom: 1.2rem;
+    }
+    
+    label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #a0a0c0;
+        font-size: 0.9rem;
+    }
+    
+    textarea {
+        width: 100%;
+        min-height: 100px;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        color: #fff;
+        font-size: 1rem;
+        resize: vertical;
+        transition: all 0.3s ease;
+    }
+    
+    textarea:focus {
+        outline: none;
+        border-color: rgba(0, 245, 255, 0.5);
+        box-shadow: 0 0 15px rgba(0, 245, 255, 0.2);
+        background: rgba(255, 255, 255, 0.12);
+    }
+    
+    .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    
+    select, input[type="number"], input[type="text"] {
+        width: 100%;
+        padding: 0.8rem;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(255,255,255,0.04);
+        color: #fff;
+    }
+
+    .small-btn {
+        padding: 0.6rem 0.9rem;
+        border-radius: 6px;
+        background: rgba(255,255,255,0.08);
+        border: none;
+        color: #fff;
+        cursor: pointer;
+    }
+
+    .small-btn:hover { background: rgba(255,255,255,0.12); }
+
+    button {
+        background: linear-gradient(45deg, #00f5ff, #0080ff);
+        border: none;
+        padding: 1.1rem 2.2rem;
+        border-radius: 10px;
+        color: white;
+        font-size: 1.05rem;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+        transition: all 0.3s ease;
+        letter-spacing: 0.5px;
+    }
+    
+    button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 245, 255, 0.4);
+    }
+    
+    .output-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 1rem 0 0.5rem 0;
+        color: #a0a0c0;
+    }
+    
+    .copy-btn {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 0.4rem 0.8rem;
+        border-radius: 5px;
+        font-size: 0.8rem;
+        width: auto;
+        margin: 0;
+    }
+    
+    .copy-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: none;
+        box-shadow: none;
+    }
+    
+    #output {
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.4);
+        border-radius: 10px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.95rem;
+        word-wrap: break-word;
+        min-height: 70px;
+        line-height: 1.5;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .instructions {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
+        font-size: 0.9rem;
+        color: #a0a0c0;
+    }
+
+    .param-section {
+        margin-top: 0.8rem;
+        padding: 0.8rem;
+        background: rgba(255,255,255,0.02);
+        border-radius: 8px;
+    }
+
+    .inline { display: inline-flex; gap: 0.5rem; align-items: center; }
+
+    .warning {
+        color: #facc15;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+    }
+
+    .copied {
+        background: rgba(74, 222, 128, 0.3) !important;
+        transition: background 0.2s;
+    }
+
+    .success {
+        color: #4ade80;
+        font-weight: 500;
+    }
+
+</style>
+```
+
+</head>
+<body>
+    <div class="container">
+        <h1>QResist Offline</h1>
+        <p class="subtitle">Secure Hashing & Password Derivation — runs entirely in your browser</p>
+
+```
+    <div class="input-group">
+        <label for="input">Enter text to hash / password to derive:</label>
+        <textarea id="input" placeholder="Type your text or password here"></textarea>
+        <div id="warning" class="warning" style="display: none;">Input &gt;1MB: Computation may take time.</div>
+    </div>
+
+    <!-- Algorithm selector -->
+    <div class="input-group">
+        <label for="algo">Algorithm:</label>
+        <div class="controls" style="grid-template-columns: 1fr 140px;">
+            <select id="algo">
+                <option value="blake3">BLAKE3 (fast, quantum-resistant)</option>
+                <option value="sha3">SHA3-512</option>
+                <option value="argon2">Argon2id (password hashing)</option>
+            </select>
+            <button id="advancedToggle" class="small-btn" type="button">Toggle Params</button>
+        </div>
+    </div>
+
+    <!-- BLAKE3 parameters -->
+    <div id="blake3Params" class="param-section" style="display:none;">
+        <div class="input-group">
+            <label for="blake3OutLen">Output length (bytes):</label>
+            <input id="blake3OutLen" type="number" min="1" max="1024" value="32">
+            <div style="margin-top:0.5rem; color:#a0a0c0; font-size:0.9rem;">BLAKE3 supports variable-length output (default: 32 bytes / 256 bits)</div>
+        </div>
+    </div>
+
+    <!-- Argon2 parameters (hidden by default) -->
+    <div id="argon2Params" class="param-section" style="display:none;">
+        <div class="input-group">
+            <label for="argonType">Argon2 Type:</label>
+            <select id="argonType">
+                <option value="id">Argon2id</option>
+                <option value="i">Argon2i</option>
+            </select>
+        </div>
+
+        <div class="controls">
+            <div>
+                <label for="timeCost">Time cost (iterations):</label>
+                <input id="timeCost" type="number" min="1" value="2">
+            </div>
+            <div>
+                <label for="memCost">Memory (KB):</label>
+                <input id="memCost" type="number" min="8" value="65536">
+            </div>
+            <div>
+                <label for="parallelism">Parallelism:</label>
+                <input id="parallelism" type="number" min="1" value="1">
+            </div>
+            <div>
+                <label for="hashLen">Output bytes (hash length):</label>
+                <input id="hashLen" type="number" min="4" max="1024" value="32">
+            </div>
+        </div>
+
+        <div class="input-group" style="margin-top:0.75rem;">
+            <label for="salt">Salt (hex):</label>
+            <div class="controls" style="grid-template-columns: 1fr 120px;">
+                <input id="salt" type="text" placeholder="Leave empty to generate random salt">
+                <button id="genSalt" class="small-btn" type="button">Generate Salt</button>
+            </div>
+            <div style="margin-top:0.5rem; color:#a0a0c0; font-size:0.9rem;">Argon2 requires a salt — generate a random salt for each password.</div>
+        </div>
+    </div>
+
+    <button id="hashBtn">Generate</button>
+    
+    <div class="output-label">
+        <span>Result:</span>
+        <div style="display:flex; gap:0.5rem;">
+            <button id="copyBtn" class="copy-btn">Copy</button>
+            <button id="downloadBtn" class="copy-btn">Download</button>
+        </div>
+    </div>
+    <div id="output">Your hash or derived key will appear here...</div>
+    
+    <div class="instructions">
+        <p><strong>How it works:</strong> This tool generates secure digests or derives keys using BLAKE3, SHA-3, or Argon2. Computation happens entirely in your browser — no data leaves your device.</p>
+        <p style="margin-top:0.5rem;"><strong>BLAKE3:</strong> Extremely fast cryptographic hash function with quantum-resistant properties. Ideal for general-purpose hashing.</p>
+        <p style="margin-top:0.5rem;"><strong>Argon2:</strong> Memory-hard password hashing. Choose parameters appropriate for your threat model. Higher memory/time increases resistance to GPU/ASIC attacks.</p>
+    </div>
+    
+    <div class="footer" style="text-align:center; margin-top:1rem; color:#6a6a8d; font-size:0.8rem;">
+        <p>QResist Offline Tool | Secure Hashing</p>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/argon2-browser/dist/argon2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blake3/dist/browser/index.min.js"></script>
+
+<script>
+    // SHA3 implementation
+    function sha3_512(message) {
+        const KECCAK_ROUNDS = 24;
+        const ROTC = [1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14, 27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44];
+        const PILN = [10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4, 15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1];
+        const utf8Encoder = new TextEncoder();
+        const messageBytes = utf8Encoder.encode(message);
+        const rate = 576;
+        const outputLength = 512;
+        const blockSize = rate / 8;
+        let state = new Array(25).fill(0n);
+        const padded = pad10Star1(messageBytes, blockSize);
+        for (let i = 0; i < padded.length; i += blockSize) {
+            for (let j = 0; j < blockSize; j += 8) {
+                const word = bytesToWord(padded.slice(i + j, i + j + 8));
+                state[Math.floor(j / 8)] ^= word;
+            }
+            state = keccakF(state, KECCAK_ROUNDS, ROTC, PILN);
+        }
+        let result = '';
+        for (let i = 0; i < outputLength / 64; i++) {
+            result += wordToHex(state[i]);
+        }
+        return result;
+    }
+
+    function pad10Star1(bytes, blockSize) {
+        const len = bytes.length;
+        let padLen = blockSize - (len % blockSize);
+        if (padLen === 0) padLen = blockSize;
+        const padded = new Uint8Array(len + padLen);
+        padded.set(bytes);
+        const padStart = len;
+        padded[padStart] |= 0x80;
+        padded[padded.length - 1] |= 0x01;
+        padded[padded.length - 1] ^= 0x06;
+        return padded;
+    }
+
+    function bytesToWord(bytes) {
+        let word = 0n;
+        for (let i = 0; i < Math.min(8, bytes.length); i++) {
+            word += BigInt(bytes[i]) << BigInt(8 * i);
+        }
+        return word;
+    }
+
+    function wordToHex(word) {
+        let hex = word.toString(16);
+        while (hex.length < 16) {
+            hex = '0' + hex;
+        }
+        return hex;
+    }
+
+    function keccakF(state, rounds, ROTC, PILN) {
+        const RC = [
+            0x0000000000000001n, 0x0000000000008082n, 0x800000000000808an,
+            0x8000000080008000n, 0x000000000000808bn, 0x0000000080000001n,
+            0x8000000080008081n, 0x8000000000008009n, 0x000000000000008an,
+            0x0000000000000088n, 0x0000000080008009n, 0x000000008000000an,
+            0x000000008000808bn, 0x800000000000008bn, 0x8000000000008089n,
+            0x8000000000008003n, 0x8000000000008002n, 0x8000000000000080n,
+            0x000000000000800an, 0x800000008000000an, 0x8000000080008081n,
+            0x8000000000008080n, 0x0000000080000001n, 0x8000000080008008n
+        ];
+        
+        for (let round = 0; round < rounds; round++) {
+            const C = new Array(5).fill(0n);
+            const D = new Array(5).fill(0n);
+            
+            for (let x = 0; x < 5; x++) {
+                C[x] = state[x] ^ state[x + 5] ^ state[x + 10] ^ state[x + 15] ^ state[x + 20];
+            }
+            
+            for (let x = 0; x < 5; x++) {
+                D[x] = C[(x + 4) % 5] ^ rot64(C[(x + 1) % 5], 1);
+            }
+            
+            for (let x = 0; x < 5; x++) {
+                for (let y = 0; y < 5; y++) {
+                    state[x + 5 * y] ^= D[x];
+                }
+            }
+            
+            let current = state[1];
+            for (let t = 0; t < 24; t++) {
+                const x = PILN[t];
+                const temp = state[x];
+                state[x] = rot64(current, ROTC[t]);
+                current = temp;
+            }
+            
+            for (let y = 0; y < 5; y++) {
+                const i = 5 * y;
+                const T = [
+                    state[i], 
+                    state[i + 1], 
+                    state[i + 2], 
+                    state[i + 3], 
+                    state[i + 4]
+                ];
+                
+                for (let x = 0; x < 5; x++) {
+                    state[i + x] = T[x] ^ (~T[(x + 1) % 5] & T[(x + 2) % 5]);
+                }
+            }
+            
+            state[0] ^= RC[round];
+        }
+        
+        return state;
+    }
+
+    function rot64(x, n) {
+        n = n % 64;
+        return ((x << BigInt(n)) | (x >> BigInt(64 - n))) & 0xffffffffffffffffn;
+    }
+
+    // UI + Argon2 + BLAKE3 integration
+    (function(){
+        'use strict';
+        const inputEl = document.getElementById('input');
+        const outputEl = document.getElementById('output');
+        const hashBtn = document.getElementById('hashBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const warningEl = document.getElementById('warning');
+        const algoSelect = document.getElementById('algo');
+        const advancedToggle = document.getElementById('advancedToggle');
+        const argon2Params = document.getElementById('argon2Params');
+        const blake3Params = document.getElementById('blake3Params');
+        const genSaltBtn = document.getElementById('genSalt');
+
+        function updateWarning() {
+            warningEl.style.display = inputEl.value.length > 1048576 ? 'block' : 'none';
+        }
+
+        inputEl.addEventListener('input', updateWarning);
+
+        algoSelect.addEventListener('change', () => {
+            argon2Params.style.display = 'none';
+            blake3Params.style.display = 'none';
+        });
+
+        advancedToggle.addEventListener('click', () => {
+            const algo = algoSelect.value;
+            if (algo === 'argon2') {
+                blake3Params.style.display = 'none';
+                argon2Params.style.display = argon2Params.style.display === 'none' ? 'block' : 'none';
+            } else if (algo === 'blake3') {
+                argon2Params.style.display = 'none';
+                blake3Params.style.display = blake3Params.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+
+        genSaltBtn.addEventListener('click', () => {
+            const saltInput = document.getElementById('salt');
+            const rand = new Uint8Array(16);
+            window.crypto.getRandomValues(rand);
+            saltInput.value = Array.from(rand).map(b => b.toString(16).padStart(2,'0')).join('');
+        });
+
+        hashBtn.addEventListener('click', () => {
+            let text = inputEl.value;
+            if (text.trim().length === 0 && inputEl.value.length > 0) {
+                text = inputEl.value;
+            }
+
+            try {
+                hashBtn.textContent = 'Working...';
+                hashBtn.disabled = true;
+                setTimeout(async () => {
+                    const algo = algoSelect.value;
+                    
+                    if (algo === 'blake3') {
+                        if (typeof blake3 === 'undefined') {
+                            outputEl.textContent = 'BLAKE3 library not available. Check your connection.';
+                        } else {
+                            const outLen = parseInt(document.getElementById('blake3OutLen').value, 10) || 32;
+                            const encoder = new TextEncoder();
+                            const data = encoder.encode(text);
+                            const hash = blake3.hash(data, { length: outLen });
+                            const hexHash = Array.from(hash).map(b => b.toString(16).padStart(2, '0')).join('');
+                            outputEl.innerHTML = `<div class="success">BLAKE3 generated successfully!</div><div class="hash-result">${hexHash}</div>
+                            <div style="margin-top:0.5rem; color:#a0a0c0; font-size:0.9rem;">Output length: ${outLen} bytes (${outLen * 8} bits)</div>`;
+                        }
+                    } else if (algo === 'sha3') {
+                        const hash = sha3_512(text);
+                        outputEl.innerHTML = `<div class="success">SHA3-512 generated successfully!</div><div class="hash-result">${hash}</div>`;
+                    } else if (algo === 'argon2') {
+                        const typeStr = document.getElementById('argonType').value;
+                        const timeCost = parseInt(document.getElementById('timeCost').value, 10) || 2;
+                        const memCost = parseInt(document.getElementById('memCost').value, 10) || 65536;
+                        const parallelism = parseInt(document.getElementById('parallelism').value, 10) || 1;
+                        const hashLen = parseInt(document.getElementById('hashLen').value, 10) || 32;
+                        const saltField = document.getElementById('salt').value.trim();
+                        
+                        let saltBytes;
+                        if (saltField.length === 0) {
+                            saltBytes = new Uint8Array(16);
+                            window.crypto.getRandomValues(saltBytes);
+                        } else {
+                            const hex = saltField.replace(/[^0-9a-fA-F]/g,'');
+                            const arr = new Uint8Array(Math.ceil(hex.length / 2));
+                            for (let i = 0; i < arr.length; i++) {
+                                arr[i] = parseInt(hex.substr(i*2,2) || '00', 16);
+                            }
+                            saltBytes = arr;
+                        }
+
+                        const argonType = (typeof argon2 !== 'undefined' && argon2.ArgonType)
+                            ? (typeStr === 'i' ? argon2.ArgonType.Argon2i : argon2.ArgonType.Argon2id)
+                            : null;
+
+                        if (typeof argon2 === 'undefined' || !argon2.hash) {
+                            outputEl.textContent = 'Argon2 library not available. Ensure argon2-browser is loaded.';
+                        } else {
+                            try {
+                                const res = await argon2.hash({
+                                    pass: text,
+                                    salt: saltBytes,
+                                    time: timeCost,
+                                    mem: memCost,
+                                    parallelism: parallelism,
+                                    hashLen: hashLen,
+                                    type: argonType || argon2.ArgonType.Argon2id
+                                });
+                                const saltHex = Array.from(saltBytes).map(b=>b.toString(16).padStart(2,'0')).join('');
+                                outputEl.innerHTML = `<div class="success">Argon2 derived key (hex):</div>
+                                    <div class="hash-result">${res.hashHex}</div>
+                                    <div style="margin-top:0.5rem; color:#a0a0c0; font-size:0.9rem;">Salt (hex): ${saltHex}</div>
+                                    <div style="margin-top:0.3rem; color:#a0a0c0; font-size:0.9rem;">Base64: ${res.hash}</div>`;
+                            } catch (e) {
+                                outputEl.textContent = 'Argon2 error: ' + e.message;
+                            }
+                        }
+                    }
+                    hashBtn.textContent = 'Generate';
+                    hashBtn.disabled = false;
+                }, 10);
+            } catch (error) {
+                outputEl.textContent = 'Error: ' + error.message;
+                hashBtn.textContent = 'Generate';
+                hashBtn.disabled = false;
+            }
+        });
+
+        copyBtn.addEventListener('click', () => {
+            const hashElement = outputEl.querySelector('.hash-result');
+            if (hashElement) {
+                const hash = hashElement.textContent;
+                navigator.clipboard.writeText(hash).then(() => {
+                    const originalText = copyBtn.textContent;
+                    copyBtn.textContent = 'Copied!';
+                    copyBtn.classList.add('copied');
+                    setTimeout(() => {
+                        copyBtn.textContent = originalText;
+                        copyBtn.classList.remove('copied');
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy: ', err);
+                });
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const hashElement = outputEl.querySelector('.hash-result');
+            if (!hashElement) return;
+            const data = hashElement.textContent;
+            const blob = new Blob([data], {type: 'text/plain;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const algo = document.getElementById('algo').value;
+            a.download = algo === 'argon2' ? 'argon2-derived-key.txt' : `${algo}-hash.txt`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        });
+
+        inputEl.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                hashBtn.click();
+            }
+        });
+
+        updateWarning();
+    })();
+</script>
+```
+
+</body>
+</html>
